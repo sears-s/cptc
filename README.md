@@ -33,7 +33,7 @@ Walkthrough: include commands, screenshots, other notes, etc.
 
 1. Go to https://github.com/fireeye/commando-vm
 2. Download and extract ZIP in Downloads
-3. Download `profile.json` and `profile_full.json` from ??? to the same folder
+3. Download `profile.json` and `profile_full.json` from https://github.com/nationalcptc-teamtools/United-States-Air-Force-Academy to the same folder
 4. Run this in PowerShell as admin:
 
 ```powershell
