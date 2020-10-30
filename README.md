@@ -90,11 +90,15 @@ Add `new.txt` to `lists/` in the Google Drive.
 ## Reconnaissance
 Initial scan (add to new Google Drive file in `scans/`):
 ```sh
-nmap <ip_range> -T5 -F -oN scan_short
+nmap <ip_range> -T5 -sS -n -F -oN scan_short.txt
 ```
 Much longer scan (add to a new Google Drive file in `scans/`):
 ```sh
-nmap <ip_range> -T5 -p- -A -oN scan_long
+nmap <ip_range> -T5 -sS -n -p- -A --version-all -oN scan_long.txt
+```
+Add `-iL <filename>` to take in target IPs via a file. Add these options for a slower scan if you get blocked:
+```sh
+-f --mtu 32 --ttl 64 -T1
 ```
 Dump traffic (use Bitvise on Windows to retrieve the PCAP and open it in Wireshark):
 ```
