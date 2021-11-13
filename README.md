@@ -278,6 +278,45 @@ impacket-wmiexec <domain_name>/<user_name>@<remote_hostname> -k -no-pass
 impacket-smbclient <domain_name>/<user_name>@<remote_hostname> -k -no-pass
 ```
 
+If you have a PowerShell, download this folder and follow the instructions in the README: https://github.com/PowerShellMafia/PowerSploit/tree/master/Privesc
+
+Download this and run it:
+- BAT version: https://github.com/carlospolop/PEASS-ng/blob/master/winPEAS/winPEASbat/winPEAS.bat
+- EXE version: https://github.com/carlospolop/PEASS-ng/blob/master/winPEAS/winPEASexe/binaries/x64/Release/winPEASx64.exe
+
+Collection of potentially useful Windows executables: https://lolbas-project.github.io/
+
+## Linux
+
+### Privilege Escalation
+
+Download this and run it: https://github.com/carlospolop/PEASS-ng/blob/master/linPEAS/linpeas.sh
+
+List sudo rights:
+
+```bash
+sudo -l
+```
+
+Find set UID binaries:
+
+```bash
+find / -xdev -user root \( -perm -4000 -o -perm -2000 \)
+```
+
+Based on these results, look at GTFOBins: https://gtfobins.github.io/
+
+### Misc
+
+Reverse shell cheat sheet: https://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet
+
+To see running processes without root, download the binary from here: https://github.com/DominicBreuker/pspy, then:
+
+```bash
+# print both commands and file system events and scan procfs every 1000 ms (=1sec)
+./pspy64 -pf -i 1000 
+```
+
 ## SCADA
 
 Good summary: https://github.com/nationalcptc-teamtools/University-of-Southern-California/blob/main/misc/scada.txt.
